@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 /**
  * Custom hook for debouncing values
@@ -27,21 +27,30 @@ import { useState, useEffect } from 'react';
 export const useDebounce = (value, delay = 300) => {
   // State to store the debounced value
   const [debouncedValue, setDebouncedValue] = useState(value);
+  const debounceRef = useRef(null);
 
   useEffect(() => {
     // TODO: Implement debouncing logic
     // 1. Set up a timer that will update debouncedValue after the delay
     // 2. Clear the previous timer if the value changes before the delay expires
     // 3. Return a cleanup function to clear the timer when the component unmounts
-    
+
     // Hint: Use setTimeout and clearTimeout
     // Remember to handle the cleanup to prevent memory leaks
-    
-    console.log('useDebounce: Setting up debounce for value:', value);
-    
+
+    debounceRef.current = setTimeout(() => {
+      console.log('useDebounce: Setting up debounce for value:', value);
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+
+
     // Placeholder implementation - replace with actual debouncing logic
-    setDebouncedValue(value);
-    
+
   }, [value, delay]);
 
   return debouncedValue;

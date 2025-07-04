@@ -14,7 +14,7 @@ const generateMockReports = (count = 100) => {
   const priorities = ['low', 'medium', 'high']
   const reportTypes = ['Monthly Summary', 'Weekly Analytics', 'User Activity', 'Performance Report', 'Budget Analysis']
   const authors = ['John Smith', 'Sarah Johnson', 'Mike Davis', 'Emily Brown', 'Chris Wilson', 'Lisa Anderson']
-  
+
   return Array.from({ length: count }, (_, i) => ({
     id: i + 1,
     title: `${reportTypes[i % reportTypes.length]} ${Math.floor(i / reportTypes.length) + 1}`,
@@ -32,7 +32,59 @@ const generateMockReports = (count = 100) => {
 }
 
 // Mock database
-let mockReports = generateMockReports(250)
+let mockReports = generateMockReports(250);
+
+
+function filterAndSort(filteredReports, sortBy, sortOrder, search, filters) {
+  // Apply search
+  if (search) {
+    const searchLower = search.toLowerCase()
+    filteredReports = filteredReports.filter(report =>
+      report.title.toLowerCase().includes(searchLower) ||
+      report.department.toLowerCase().includes(searchLower) ||
+      report.author.toLowerCase().includes(searchLower)
+    )
+  }
+
+  // Apply filters
+  if (filters.department) {
+    filteredReports = filteredReports.filter(report => report.department === filters.department)
+  }
+  if (filters.status) {
+    filteredReports = filteredReports.filter(report => report.status === filters.status)
+  }
+  if (filters.priority) {
+    filteredReports = filteredReports.filter(report => report.priority === filters.priority)
+  }
+  if (filters.dateFrom) {
+    filteredReports = filteredReports.filter(report =>
+      new Date(report.createdAt) >= new Date(filters.dateFrom)
+    )
+  }
+  if (filters.dateTo) {
+    filteredReports = filteredReports.filter(report =>
+      new Date(report.createdAt) <= new Date(filters.dateTo)
+    )
+  }
+
+  // Apply sorting
+  filteredReports.sort((a, b) => {
+    let aVal = a[sortBy]
+    let bVal = b[sortBy]
+
+    if (sortBy === 'createdAt' || sortBy === 'updatedAt') {
+      aVal = new Date(aVal)
+      bVal = new Date(bVal)
+    }
+
+    if (sortOrder === 'desc') {
+      return bVal > aVal ? 1 : bVal < aVal ? -1 : 0
+    } else {
+      return aVal > bVal ? 1 : aVal < bVal ? -1 : 0
+    }
+  })
+  return filteredReports
+}
 
 export const reportsAPI = {
   // GET /api/reports with pagination, sorting, filtering
@@ -45,67 +97,21 @@ export const reportsAPI = {
     search = ''
   } = {}) {
     await delay(MOCK_DELAY)
-    
+
     // Simulate potential network error (3% chance)
     if (Math.random() < 0.03) {
       throw new Error('Network error: Failed to fetch reports')
     }
-    
+
     let filteredReports = [...mockReports]
-    
-    // Apply search
-    if (search) {
-      const searchLower = search.toLowerCase()
-      filteredReports = filteredReports.filter(report =>
-        report.title.toLowerCase().includes(searchLower) ||
-        report.department.toLowerCase().includes(searchLower) ||
-        report.author.toLowerCase().includes(searchLower)
-      )
-    }
-    
-    // Apply filters
-    if (filters.department) {
-      filteredReports = filteredReports.filter(report => report.department === filters.department)
-    }
-    if (filters.status) {
-      filteredReports = filteredReports.filter(report => report.status === filters.status)
-    }
-    if (filters.priority) {
-      filteredReports = filteredReports.filter(report => report.priority === filters.priority)
-    }
-    if (filters.dateFrom) {
-      filteredReports = filteredReports.filter(report => 
-        new Date(report.createdAt) >= new Date(filters.dateFrom)
-      )
-    }
-    if (filters.dateTo) {
-      filteredReports = filteredReports.filter(report => 
-        new Date(report.createdAt) <= new Date(filters.dateTo)
-      )
-    }
-    
-    // Apply sorting
-    filteredReports.sort((a, b) => {
-      let aVal = a[sortBy]
-      let bVal = b[sortBy]
-      
-      if (sortBy === 'createdAt' || sortBy === 'updatedAt') {
-        aVal = new Date(aVal)
-        bVal = new Date(bVal)
-      }
-      
-      if (sortOrder === 'desc') {
-        return bVal > aVal ? 1 : bVal < aVal ? -1 : 0
-      } else {
-        return aVal > bVal ? 1 : aVal < bVal ? -1 : 0
-      }
-    })
-    
+
+    filteredReports = filterAndSort(filteredReports, sortBy, sortOrder, search, filters);
+
     const totalCount = filteredReports.length
     const totalPages = Math.ceil(totalCount / pageSize)
     const startIndex = (page - 1) * pageSize
     const paginatedReports = filteredReports.slice(startIndex, startIndex + pageSize)
-    
+
     return {
       success: true,
       data: {
@@ -123,15 +129,28 @@ export const reportsAPI = {
     }
   },
 
+  //Get data for CSV Export
+  async getCSVdata({
+    sortBy = 'createdAt',
+    sortOrder = 'desc',
+    filters = {},
+    search = ''
+  } = {}) {
+
+    let filteredReports = [...mockReports]
+
+    return filterAndSort(filteredReports, sortBy, sortOrder, search, filters);
+  },
+
   // POST /api/reports
   async createReport(reportData) {
     await delay(MOCK_DELAY)
-    
+
     // Simulate validation error
     if (!reportData.name || reportData.name.trim().length === 0) {
       throw new Error('Validation error: Report name is required')
     }
-    
+
     const newReport = {
       id: Math.max(...mockReports.map(r => r.id)) + 1,
       name: reportData.name.trim(),
@@ -146,9 +165,9 @@ export const reportsAPI = {
       executionTime: '0s',
       priority: reportData.priority || 'medium'
     }
-    
+
     mockReports.unshift(newReport)
-    
+
     return {
       success: true,
       data: newReport,
@@ -159,25 +178,25 @@ export const reportsAPI = {
   // PUT /api/reports/:id
   async updateReport(id, updates) {
     await delay(MOCK_DELAY)
-    
+
     const reportIndex = mockReports.findIndex(report => report.id === id)
-    
+
     if (reportIndex === -1) {
       throw new Error('Report not found')
     }
-    
+
     if (updates.name && updates.name.trim().length === 0) {
       throw new Error('Validation error: Report name cannot be empty')
     }
-    
+
     const updatedReport = {
       ...mockReports[reportIndex],
       ...updates,
       lastModified: new Date().toISOString()
     }
-    
+
     mockReports[reportIndex] = updatedReport
-    
+
     return {
       success: true,
       data: updatedReport,
@@ -188,16 +207,16 @@ export const reportsAPI = {
   // DELETE /api/reports/:id
   async deleteReport(id) {
     await delay(MOCK_DELAY)
-    
+
     const reportIndex = mockReports.findIndex(report => report.id === id)
-    
+
     if (reportIndex === -1) {
       throw new Error('Report not found')
     }
-    
+
     const deletedReport = mockReports[reportIndex]
     mockReports.splice(reportIndex, 1)
-    
+
     return {
       success: true,
       data: deletedReport,
@@ -208,17 +227,17 @@ export const reportsAPI = {
   // POST /api/reports/:id/execute
   async executeReport(id) {
     await delay(MOCK_DELAY * 2) // Longer delay for report execution
-    
+
     const report = mockReports.find(report => report.id === id)
-    
+
     if (!report) {
       throw new Error('Report not found')
     }
-    
+
     // Simulate execution
     report.status = 'active'
     report.lastModified = new Date().toISOString()
-    
+
     // Simulate completion after delay
     setTimeout(() => {
       report.status = Math.random() > 0.1 ? 'completed' : 'failed'
@@ -226,7 +245,7 @@ export const reportsAPI = {
       report.fileSize = `${(Math.random() * 50 + 5).toFixed(1)} MB`
       report.executionTime = `${(Math.random() * 180 + 10).toFixed(1)}s`
     }, 3000)
-    
+
     return {
       success: true,
       data: report,
@@ -237,7 +256,7 @@ export const reportsAPI = {
   // GET /api/reports/summary
   async getReportsSummary() {
     await delay(500) // Faster for dashboard
-    
+
     const summary = mockReports.reduce((acc, report) => {
       acc.total++
       acc.byStatus[report.status] = (acc.byStatus[report.status] || 0) + 1
@@ -248,7 +267,7 @@ export const reportsAPI = {
       byStatus: {},
       byDepartment: {}
     })
-    
+
     return {
       success: true,
       data: summary,

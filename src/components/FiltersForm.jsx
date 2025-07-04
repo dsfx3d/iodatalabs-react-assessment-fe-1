@@ -1,4 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import useDebounce from '../hooks/useDebounce';
+import { reportsAPI } from '../services/reportsAPI';
+import { useReportsData } from '../hooks/useReportsData';
+import { exportAsCSV } from '../lib/csvExport';
 
 export function FiltersForm({ onSubmit, initialFilters = {} }) {
   const [filters, setFilters] = useState({
@@ -9,7 +13,16 @@ export function FiltersForm({ onSubmit, initialFilters = {} }) {
     dateTo: initialFilters.dateTo || '',
     search: initialFilters.search || '',
     ...initialFilters
-  })
+  });
+
+  const debounceVal = useDebounce(filters.search);
+  const { sorting } = useReportsData();
+
+  useEffect(() => {
+    if (debounceVal.length !== 0 && !!debounceVal) {
+      onSubmit(filters);
+    }
+  }, [debounceVal]);
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -31,6 +44,28 @@ export function FiltersForm({ onSubmit, initialFilters = {} }) {
 
   const handleChange = (field, value) => {
     setFilters(prev => ({ ...prev, [field]: value }))
+  };
+
+  async function handleCSV() {
+    const headers = [
+      "id",
+      "title",
+      "status",
+      "department",
+      "priority",
+      "createdAt",
+      "updatedAt",
+    ];
+    const sortBy = sorting.length > 0 ? sorting[0].id : 'createdAt';
+    const sortOrder = sorting.length > 0 ? (sorting[0].desc ? 'desc' : 'asc') : 'desc';
+    const datacsv = await reportsAPI.getCSVdata({
+      sortBy,
+      sortOrder,
+      filters,
+      search: filters.search,
+    });
+
+    exportAsCSV(datacsv, "reports", headers);
   }
 
   return (
@@ -141,22 +176,28 @@ export function FiltersForm({ onSubmit, initialFilters = {} }) {
           </div>
         </div>
 
-        <div className="flex items-center space-x-3 pt-4">
-          <button
-            type="submit"
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-          >
-            Apply Filters
-          </button>
-          <button
-            type="button"
-            onClick={handleReset}
-            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-          >
-            Reset
-          </button>
+        <div className="flex justify-between items-center flex-wrap">
+          <div className='flex items-center space-x-3 pt-4 '>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            >
+              Apply Filters
+            </button>
+            <button
+              type="button"
+              onClick={handleReset}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            >
+              Reset
+            </button>
+          </div>
+          <div className='pt-4 '>
+            <button onClick={handleCSV} className='px-4 py-2 block bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'>Export CSV Data</button>
+          </div>
         </div>
       </form>
+
     </div>
   )
 }

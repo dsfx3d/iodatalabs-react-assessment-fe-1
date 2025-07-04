@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { reportsAPI } from '../services/reportsAPI'
 
 export const useReportsData = () => {
-  const [data, setData] = useState([])
+  const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [pagination, setPagination] = useState({
